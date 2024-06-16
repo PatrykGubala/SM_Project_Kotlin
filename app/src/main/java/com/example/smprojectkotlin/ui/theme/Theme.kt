@@ -21,7 +21,7 @@ private val DarkColorScheme =
         onPrimary = White80,
         onSecondary = White80,
         onTertiary = White80,
-        onBackground = White100,
+        onBackground = Black100,
         onSurface = White80,
     )
 
@@ -35,7 +35,7 @@ private val LightColorScheme =
         onPrimary = White80,
         onSecondary = White80,
         onTertiary = White80,
-        onBackground = White80,
+        onBackground = Black100,
         onSurface = White80,
     )
 

@@ -21,17 +21,18 @@ import com.example.smprojectkotlin.ui.theme.ThemeStyles.searchStyle
 import com.example.smprojectkotlin.ui.theme.components.RecordingItem
 
 @Composable
-fun RecordingScreen(
+fun AllRecordingsScreen(
     recordings: List<Recording>,
     onStartRecording: () -> Unit,
+    onPlayRecording: (Recording) -> Unit,
 ) {
-    var selectedOption by remember { mutableStateOf("volume") }
     var searchText by remember { mutableStateOf(TextFieldValue("")) }
 
-    val filteredRecordings =
+    val filteredRecordings by rememberUpdatedState(
         recordings.filter {
             it.title.contains(searchText.text, ignoreCase = true)
-        }
+        },
+    )
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -60,24 +61,14 @@ fun RecordingScreen(
                     innerTextField()
                 },
             )
-
-            IconButton(
-                onClick = { selectedOption = if (selectedOption == "volume") "bluetooth" else "volume" },
-                modifier = Modifier.align(Alignment.CenterVertically),
-            ) {
-                Icon(
-                    painter =
-                        painterResource(
-                            id = if (selectedOption == "volume") R.drawable.volume_2 else R.drawable.bluetooth,
-                        ),
-                    contentDescription = if (selectedOption == "volume") "Volume" else "Bluetooth",
-                )
-            }
         }
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(filteredRecordings) { recording ->
-                RecordingItem(recording, onPlayClick = { })
+                RecordingItem(
+                    recording,
+                    onPlayClick = { onPlayRecording(recording) },
+                )
             }
         }
 
@@ -92,11 +83,11 @@ fun RecordingScreen(
                 onClick = onStartRecording,
                 modifier =
                     Modifier
-                        .size(88.dp)
-                        .padding(8.dp),
+                        .size(80.dp)
+                        .padding(4.dp),
                 shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.onPrimary,
-                contentColor = MaterialTheme.colorScheme.primary,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onBackground,
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.play),

@@ -6,4 +6,5 @@ data class Recording(
     val date: String,
     val duration: String,
     val fileSize: String,
+    val filePath: String,
 )

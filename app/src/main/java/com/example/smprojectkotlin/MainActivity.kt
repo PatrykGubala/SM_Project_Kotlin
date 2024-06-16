@@ -15,13 +15,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.smprojectkotlin.model.Recording
 import com.example.smprojectkotlin.ui.theme.SMProjectKotlinTheme
+import com.example.smprojectkotlin.ui.theme.screens.AllRecordingsScreen
+import com.example.smprojectkotlin.ui.theme.screens.AudioPlaybackScreen
 import com.example.smprojectkotlin.ui.theme.screens.AudioRecordingScreen
-import com.example.smprojectkotlin.ui.theme.screens.RecordingScreen
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -83,10 +86,28 @@ class MainActivity : ComponentActivity() {
 
         NavHost(navController = navController, startDestination = "recordingScreen") {
             composable("recordingScreen") {
-                RecordingScreen(recordings = recordings.value, onStartRecording = { navController.navigate("audioRecordingScreen") })
+                AllRecordingsScreen(
+                    recordings = recordings.value,
+                    onStartRecording = { navController.navigate("audioRecordingScreen") },
+                    onPlayRecording = { recording -> navController.navigate("audioPlaybackScreen/${recording.id}") },
+                )
             }
             composable("audioRecordingScreen") {
-                AudioRecordingScreen(onCancel = { navController.popBackStack() }, onSave = { navController.popBackStack() })
+                AudioRecordingScreen(
+                    onCancel = { navController.popBackStack() },
+                    onSave = { navController.popBackStack() },
+                    navController = navController,
+                )
+            }
+            composable(
+                route = "audioPlaybackScreen/{recordingId}",
+                arguments = listOf(navArgument("recordingId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val recordingId = backStackEntry.arguments?.getString("recordingId")
+                val recording = recordings.value.find { it.id == recordingId }
+                if (recording != null) {
+                    AudioPlaybackScreen(navController = navController, recording = recording)
+                }
             }
         }
     }
@@ -117,6 +138,7 @@ class MainActivity : ComponentActivity() {
                         date = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(java.util.Date(file.lastModified())),
                         duration = duration,
                         fileSize = convertFileSizeToReadableFormat(file.length()),
+                        filePath = file.absolutePath,
                     )
                 recordings.add(recording)
             } else {

@@ -1,72 +1,57 @@
 package com.example.smprojectkotlin.ui.theme.screens
 
-import android.media.MediaPlayer
+import android.util.Log
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.example.smprojectkotlin.R
 import com.example.smprojectkotlin.ui.theme.components.AudioRecorder
-import com.example.smprojectkotlin.ui.theme.components.Timeline
-import com.example.smprojectkotlin.ui.theme.components.Waveform
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlin.random.Random
+import kotlinx.coroutines.launch
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AudioRecordingScreen(
     onCancel: () -> Unit,
     onSave: () -> Unit,
+    navController: NavController,
 ) {
-    var isRecording by remember { mutableStateOf(false) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var recordedTime by remember { mutableStateOf(0) } // in milliseconds
-    var timelineStartIndex by remember { mutableStateOf(0) }
-    var amplitudes by remember { mutableStateOf(listOf<Int>()) }
-    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
-    val audioRecorder = remember { AudioRecorder() }
+    var isRecording by remember { mutableStateOf(true) }
+    var isPaused by remember { mutableStateOf(false) }
+    var recordedTime by remember { mutableStateOf(0) }
+    val context = LocalContext.current
+    val audioRecorder = remember { AudioRecorder(context) }
+    var recordingPath by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
-    val density = LocalDensity.current
-    val lineSpacing = with(density) { 8.dp.toPx() }
-    val lineWidth = with(density) { 2.dp.toPx() }
-    val maxSegments = with(density) { (400.dp.toPx() / (lineWidth + lineSpacing)).toInt() }
-
-    LaunchedEffect(isRecording) {
-        while (isRecording) {
-            delay(100L)
-            recordedTime += 100
-
-            val amplitude = audioRecorder.getAmplitude()
-            amplitudes =
-                if (amplitudes.size < maxSegments) {
-                    amplitudes + amplitude
-                } else {
-                    amplitudes.drop(1) + amplitude
-                }
-
-            if ((recordedTime / 200) >= maxSegments / 2) {
-                timelineStartIndex = (recordedTime / 200) - maxSegments / 2
-            }
-        }
+    LaunchedEffect(Unit) {
+        audioRecorder.startRecording()
     }
 
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            mediaPlayer?.start()
-        } else {
-            mediaPlayer?.pause()
+    LaunchedEffect(isRecording) {
+        coroutineScope.launch(Dispatchers.Default) {
+            while (isRecording && !isPaused) {
+                delay(100L)
+                recordedTime += 100
+            }
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            mediaPlayer?.release()
+            if (isRecording) {
+                audioRecorder.stopRecording()
+            }
         }
     }
 
@@ -74,7 +59,14 @@ fun AudioRecordingScreen(
         TopAppBar(
             title = { Text("Recording") },
             navigationIcon = {
-                TextButton(onClick = onCancel) {
+                TextButton(onClick = {
+                    recordingPath?.let { File(it).delete() }
+                    if (isRecording) {
+                        audioRecorder.stopRecording()
+                    }
+                    Log.d("AudioRecordingScreen", "Recording cancelled and file deleted: $recordingPath")
+                    onCancel()
+                }) {
                     Text(
                         text = "Cancel",
                         color = Color.Red,
@@ -82,7 +74,17 @@ fun AudioRecordingScreen(
                 }
             },
             actions = {
-                TextButton(onClick = onSave) {
+                TextButton(onClick = {
+                    if (isRecording || isPaused) {
+                        isRecording = false
+                        isPaused = false
+                        audioRecorder.stopRecording()
+                        recordingPath = audioRecorder.getOutputFilePath()
+                        Log.d("AudioRecordingScreen", "Recording saved at: $recordingPath")
+                    }
+                    onSave()
+                    navController.navigate("recordingScreen")
+                }) {
                     Text(
                         text = "Save",
                         color = Color.Blue,
@@ -92,87 +94,80 @@ fun AudioRecordingScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // Timeline visualization
-        Timeline(
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .weight(1f)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-            recordedTime = recordedTime,
-            timelineStartIndex = timelineStartIndex,
-        )
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+        }
 
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .weight(1f)
                     .padding(16.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Waveform(
-                modifier = Modifier.size(400.dp),
-                amplitudes = amplitudes,
-                currentTime = recordedTime,
-                timelineStartIndex = timelineStartIndex,
-            )
-        }
-
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            IconButton(onClick = {
-                if (isRecording) {
-                    isRecording = false
-                    audioRecorder.stopRecording()
-                    mediaPlayer =
-                        MediaPlayer().apply {
-                            setDataSource(audioRecorder.getOutputFilePath())
-                            prepare()
-                        }
-                } else {
-                    isRecording = true
-                    audioRecorder.startRecording()
-                }
-            }) {
+            FloatingActionButton(
+                onClick = {
+                    if (isRecording && !isPaused) {
+                        isPaused = true
+                        isRecording = false
+                        audioRecorder.pauseRecording()
+                        recordingPath = audioRecorder.getOutputFilePath()
+                        Log.d("AudioRecordingScreen", "Recording paused at: $recordingPath")
+                    } else if (!isRecording && isPaused) {
+                        audioRecorder.stopRecording()
+                        audioRecorder.deleteRecording()
+                        isPaused = false
+                        recordingPath = null
+                        Log.d("AudioRecordingScreen", "Recording deleted")
+                    } else {
+                        isRecording = true
+                        isPaused = false
+                        audioRecorder.startRecording()
+                        Log.d("AudioRecordingScreen", "Recording started at: $recordingPath")
+                    }
+                },
+                modifier =
+                    Modifier
+                        .size(80.dp)
+                        .padding(4.dp),
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onBackground,
+            ) {
                 Icon(
                     painter =
                         painterResource(
-                            id = if (isRecording) R.drawable.pause else R.drawable.play,
+                            id =
+                                when {
+                                    isPaused -> R.drawable.x_circle
+                                    isRecording -> R.drawable.pause
+                                    else -> R.drawable.play
+                                },
                         ),
-                    contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
-                    modifier = Modifier.size(48.dp),
+                    contentDescription =
+                        when {
+                            isPaused -> "Delete"
+                            isRecording -> "Pause"
+                            else -> "Play"
+                        },
+                    modifier = Modifier.size(64.dp),
                 )
             }
-
-            if (!isRecording) {
-                Spacer(modifier = Modifier.width(16.dp))
-
-                IconButton(onClick = {
-                    isPlaying = !isPlaying
-                }) {
-                    Icon(
-                        painter =
-                            painterResource(
-                                id = if (isPlaying) R.drawable.pause else R.drawable.play,
-                            ),
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(48.dp),
-                    )
-                }
-            }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = String.format("%02d:%02d,%02d", recordedTime / 1000 / 60, (recordedTime / 1000) % 60, (recordedTime % 1000) / 10),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
     }
-}
-
-fun generateRandomAmplitudes(size: Int): List<Int> {
-    return List(size) { Random.nextInt(10, 100) }
-}
-
-fun updateAmplitudes(currentAmplitudes: List<Int>): List<Int> {
-    return currentAmplitudes.drop(1) + Random.nextInt(10, 100)
 }

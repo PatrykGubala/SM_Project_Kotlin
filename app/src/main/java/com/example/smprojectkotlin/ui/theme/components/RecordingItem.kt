@@ -1,15 +1,7 @@
 package com.example.smprojectkotlin.ui.theme.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,21 +18,26 @@ fun RecordingItem(
     recording: Recording,
     onPlayClick: () -> Unit,
 ) {
-    val cardColors =
-        CardDefaults.cardColors(
-            containerColor = White100,
-        )
+    val cardColors = CardDefaults.cardColors(containerColor = White100)
+    val cardElevation = CardDefaults.cardElevation()
+    val paddingHorizontal = 16.dp
+    val paddingVertical = 8.dp
+    val innerPadding = 4.dp
+    val innerVerticalPadding = 12.dp
+    val bottomPadding = 8.dp
+    val textPaddingStart = 12.dp
+
     Card(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(),
+                .padding(horizontal = paddingHorizontal)
+                .padding(vertical = paddingVertical),
+        elevation = cardElevation,
         colors = cardColors,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = innerPadding, vertical = innerVerticalPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -48,15 +45,13 @@ fun RecordingItem(
                 Text(
                     text = recording.title,
                     style = ThemeStyles.titleStyle,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = bottomPadding, start = textPaddingStart),
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = recording.date,
                         style = ThemeStyles.dateStyle,
-                        modifier = Modifier.padding(end = 8.dp),
+                        modifier = Modifier.padding(end = bottomPadding, start = textPaddingStart),
                     )
                     Text(
                         text = recording.fileSize,
@@ -64,9 +59,7 @@ fun RecordingItem(
                     )
                 }
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(text = recording.duration, style = ThemeStyles.durationStyle)
                 IconButton(onClick = onPlayClick) {
                     Icon(
