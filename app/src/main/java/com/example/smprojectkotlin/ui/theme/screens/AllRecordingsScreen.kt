@@ -87,7 +87,7 @@ fun AllRecordingsScreen(
                         .padding(4.dp),
                 shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onBackground,
+                contentColor = MaterialTheme.colorScheme.background,
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.play),

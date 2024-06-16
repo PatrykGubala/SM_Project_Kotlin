@@ -3,20 +3,22 @@ package com.example.smprojectkotlin.ui.theme.screens
 import android.content.Context
 import android.media.MediaPlayer
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.smprojectkotlin.R
 import com.example.smprojectkotlin.model.Recording
+import com.example.smprojectkotlin.ui.theme.White80
 import com.linc.audiowaveform.AudioWaveform
 import com.linc.audiowaveform.model.AmplitudeType
 import com.linc.audiowaveform.model.WaveformAlignment
@@ -47,6 +49,7 @@ suspend fun processAudio(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AudioPlaybackScreen(
     navController: NavController,
@@ -55,7 +58,7 @@ fun AudioPlaybackScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableStateOf(0) }
     val mediaPlayer = remember { MediaPlayer() }
-    var totalDuration by remember { mutableStateOf(0) }
+    var totalDuration by remember { mutableStateOf(1) }
     val scope = rememberCoroutineScope()
     val amplitudes = remember { mutableStateListOf<Int>() }
     var waveformProgress by remember { mutableStateOf(0F) }
@@ -73,8 +76,13 @@ fun AudioPlaybackScreen(
             scope.launch {
                 while (mediaPlayer.isPlaying) {
                     currentPosition = mediaPlayer.currentPosition
-                    waveformProgress = currentPosition.toFloat() / totalDuration
-                    delay(100L)
+                    waveformProgress =
+                        if (totalDuration > 0) {
+                            currentPosition.toFloat() / totalDuration
+                        } else {
+                            0f
+                        }
+                    delay(10L)
                 }
                 if (!mediaPlayer.isPlaying) {
                     isPlaying = false
@@ -94,7 +102,7 @@ fun AudioPlaybackScreen(
         mediaPlayer.reset()
         mediaPlayer.setDataSource(File(recording.filePath).absolutePath)
         mediaPlayer.prepare()
-        totalDuration = mediaPlayer.duration
+        totalDuration = mediaPlayer.duration.takeIf { it > 0 } ?: 1
         currentPosition = 0
 
         scope.launch {
@@ -123,32 +131,54 @@ fun AudioPlaybackScreen(
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "Playing: ${recording.title}",
+        TopAppBar(
+            title = {
+                Text(
+                    text = recording.title,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = { navController.navigateUp() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.arrow_left),
+                        contentDescription = "Go Back",
+                    )
+                }
+            },
         )
-        Spacer(modifier = Modifier.height(64.dp))
 
-        AudioWaveform(
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(300.dp),
-            waveformAlignment = WaveformAlignment.Center,
-            amplitudeType = AmplitudeType.Avg,
-            progressBrush = SolidColor(Color.Magenta),
-            waveformBrush = SolidColor(Color.LightGray),
-            spikeWidth = 4.dp,
-            spikePadding = 2.dp,
-            spikeRadius = 4.dp,
-            progress = waveformProgress,
-            amplitudes = amplitudes.toList(), // Make sure to pass the list of amplitudes
-            onProgressChange = { newProgress ->
-                Log.d("AudioWaveform", "Progress changed: $newProgress")
-                waveformProgress = newProgress
-                mediaPlayer.seekTo((newProgress * totalDuration).toInt())
-            },
-            onProgressChangeFinished = {},
-        )
+                    .padding(horizontal = 16.dp)
+                    .height(200.dp)
+                    .background(White80),
+            contentAlignment = Alignment.Center,
+        ) {
+            AudioWaveform(
+                modifier = Modifier.fillMaxSize(),
+                waveformAlignment = WaveformAlignment.Center,
+                style = Fill,
+                amplitudeType = AmplitudeType.Avg,
+                progressBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                waveformBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                spikeWidth = 2.dp,
+                spikePadding = 4.dp,
+                spikeRadius = 0.dp,
+                progress = waveformProgress,
+                amplitudes = amplitudes.toList(),
+                onProgressChange = { newProgress ->
+                    Log.d("AudioWaveform", "Progress changed: $newProgress")
+                    waveformProgress = newProgress
+                    mediaPlayer.seekTo((newProgress * totalDuration).toInt())
+                },
+                onProgressChangeFinished = {},
+            )
+        }
         Spacer(modifier = Modifier.weight(1f))
 
         Column(
@@ -194,29 +224,72 @@ fun AudioPlaybackScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            FloatingActionButton(
-                onClick = {
-                    if (isPlaying) {
-                        mediaPlayer.pause()
-                    } else {
-                        mediaPlayer.start()
-                    }
-                    isPlaying = !isPlaying
-                },
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .size(80.dp)
-                        .padding(4.dp),
-                shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.background,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    painter = painterResource(id = if (isPlaying) R.drawable.pause else R.drawable.play),
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    modifier = Modifier.size(64.dp),
-                )
+                FloatingActionButton(
+                    onClick = {
+                        mediaPlayer.seekTo((mediaPlayer.currentPosition - 5000).coerceAtLeast(0))
+                        currentPosition = mediaPlayer.currentPosition
+                    },
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.background,
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.rewind),
+                        contentDescription = "Rewind 5 seconds",
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                FloatingActionButton(
+                    onClick = {
+                        if (isPlaying) {
+                            mediaPlayer.pause()
+                        } else {
+                            mediaPlayer.start()
+                        }
+                        isPlaying = !isPlaying
+                    },
+                    modifier =
+                        Modifier
+                            .size(80.dp)
+                            .padding(4.dp),
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.background,
+                ) {
+                    Icon(
+                        painter = painterResource(id = if (isPlaying) R.drawable.pause else R.drawable.play),
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(64.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                FloatingActionButton(
+                    onClick = {
+                        mediaPlayer.seekTo((mediaPlayer.currentPosition + 5000).coerceAtMost(totalDuration))
+                        currentPosition = mediaPlayer.currentPosition
+                    },
+                    shape = CircleShape,
+                    modifier = Modifier.size(44.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.background,
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.rewind_backwards),
+                        contentDescription = "Forward 5 seconds",
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
             }
         }
     }

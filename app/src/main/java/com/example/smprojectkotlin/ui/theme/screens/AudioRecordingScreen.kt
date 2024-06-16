@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.smprojectkotlin.R
 import com.example.smprojectkotlin.ui.theme.components.AudioRecorder
@@ -23,7 +24,7 @@ import java.io.File
 @Composable
 fun AudioRecordingScreen(
     onCancel: () -> Unit,
-    onSave: () -> Unit,
+    onSave: (String) -> Unit,
     navController: NavController,
 ) {
     var isRecording by remember { mutableStateOf(true) }
@@ -34,6 +35,9 @@ fun AudioRecordingScreen(
     var recordingPath by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
+    var showDialog by remember { mutableStateOf(false) }
+    var recordingTitle by remember { mutableStateOf("") }
+
     LaunchedEffect(Unit) {
         audioRecorder.startRecording()
     }
@@ -41,8 +45,8 @@ fun AudioRecordingScreen(
     LaunchedEffect(isRecording) {
         coroutineScope.launch(Dispatchers.Default) {
             while (isRecording && !isPaused) {
-                delay(100L)
-                recordedTime += 100
+                delay(20L)
+                recordedTime += 20
             }
         }
     }
@@ -70,6 +74,7 @@ fun AudioRecordingScreen(
                     Text(
                         text = "Cancel",
                         color = Color.Red,
+                        fontSize = 18.sp,
                     )
                 }
             },
@@ -82,12 +87,12 @@ fun AudioRecordingScreen(
                         recordingPath = audioRecorder.getOutputFilePath()
                         Log.d("AudioRecordingScreen", "Recording saved at: $recordingPath")
                     }
-                    onSave()
-                    navController.navigate("recordingScreen")
+                    showDialog = true
                 }) {
                     Text(
                         text = "Save",
                         color = Color.Blue,
+                        fontSize = 18.sp,
                     )
                 }
             },
@@ -104,6 +109,13 @@ fun AudioRecordingScreen(
             verticalArrangement = Arrangement.Center,
         ) {
         }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = String.format("%02d:%02d,%02d", recordedTime / 1000 / 60, (recordedTime / 1000) % 60, (recordedTime % 1000) / 10),
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 48.sp),
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
 
         Box(
             modifier =
@@ -125,7 +137,8 @@ fun AudioRecordingScreen(
                         audioRecorder.deleteRecording()
                         isPaused = false
                         recordingPath = null
-                        Log.d("AudioRecordingScreen", "Recording deleted")
+                        recordedTime = 0
+                        Log.d("AudioRecordingScreen", "Recording deleted and reset")
                     } else {
                         isRecording = true
                         isPaused = false
@@ -139,7 +152,7 @@ fun AudioRecordingScreen(
                         .padding(4.dp),
                 shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onBackground,
+                contentColor = MaterialTheme.colorScheme.background,
             ) {
                 Icon(
                     painter =
@@ -162,12 +175,64 @@ fun AudioRecordingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = String.format("%02d:%02d,%02d", recordedTime / 1000 / 60, (recordedTime / 1000) % 60, (recordedTime % 1000) / 10),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
+        if (showDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showDialog = false
+                },
+                title = {
+                    Text(
+                        text = "Save Recording",
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Enter a title for your recording:",
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = recordingTitle,
+                            onValueChange = { recordingTitle = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors =
+                                TextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.background,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.background,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                ),
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showDialog = false
+                            recordingPath?.let {
+                                val newFilePath = audioRecorder.renameRecording(recordingTitle)
+                                onSave(newFilePath)
+                                navController.navigate("recordingScreen")
+                            }
+                        },
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = {
+                            showDialog = false
+                        },
+                    ) {
+                        Text("Cancel")
+                    }
+                },
+            )
+        }
     }
 }

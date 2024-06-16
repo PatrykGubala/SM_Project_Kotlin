@@ -61,6 +61,17 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
+    fun renameRecording(newTitle: String): String {
+        val newFile = File(outputFilePath.replace(Regex("recording_\\d+"), newTitle))
+        val oldFile = File(outputFilePath)
+        if (oldFile.exists()) {
+            oldFile.renameTo(newFile)
+            outputFilePath = newFile.absolutePath
+            Log.d("AudioRecorder", "Recording renamed to: $outputFilePath")
+        }
+        return outputFilePath
+    }
+
     fun getOutputFilePath(): String {
         return outputFilePath
     }
