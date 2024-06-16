@@ -1,20 +1,51 @@
 package com.example.smprojectkotlin.ui.theme.screens
 
+import android.content.Context
 import android.media.MediaPlayer
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.smprojectkotlin.R
 import com.example.smprojectkotlin.model.Recording
+import com.linc.audiowaveform.AudioWaveform
+import com.linc.audiowaveform.model.AmplitudeType
+import com.linc.audiowaveform.model.WaveformAlignment
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import linc.com.amplituda.Amplituda
+import linc.com.amplituda.exceptions.io.AmplitudaIOException
 import java.io.File
+
+suspend fun processAudio(
+    context: Context,
+    filePath: String,
+): List<Int>? {
+    return withContext(Dispatchers.IO) {
+        try {
+            val amplituda = Amplituda(context)
+            val result = amplituda.processAudio(filePath).get()
+            val amplitudes = result.amplitudesAsList()
+            Log.d("AudioProcessing", "Successfully processed audio, amplitudes: $amplitudes")
+            amplitudes
+        } catch (e: AmplitudaIOException) {
+            e.printStackTrace()
+            Log.e("AudioProcessing", "Error processing audio: ${e.message}")
+            null
+        }
+    }
+}
 
 @Composable
 fun AudioPlaybackScreen(
@@ -26,6 +57,9 @@ fun AudioPlaybackScreen(
     val mediaPlayer = remember { MediaPlayer() }
     var totalDuration by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+    val amplitudes = remember { mutableStateListOf<Int>() }
+    var waveformProgress by remember { mutableStateOf(0F) }
+    val context = LocalContext.current
 
     DisposableEffect(Unit) {
         onDispose {
@@ -39,7 +73,8 @@ fun AudioPlaybackScreen(
             scope.launch {
                 while (mediaPlayer.isPlaying) {
                     currentPosition = mediaPlayer.currentPosition
-                    delay(5L)
+                    waveformProgress = currentPosition.toFloat() / totalDuration
+                    delay(100L)
                 }
                 if (!mediaPlayer.isPlaying) {
                     isPlaying = false
@@ -61,6 +96,18 @@ fun AudioPlaybackScreen(
         mediaPlayer.prepare()
         totalDuration = mediaPlayer.duration
         currentPosition = 0
+
+        scope.launch {
+            Log.d("AudioPlaybackScreen", "Processing audio for file: ${recording.filePath}")
+            val processedAmplitudes = processAudio(context, recording.filePath)
+            if (processedAmplitudes != null) {
+                amplitudes.clear()
+                amplitudes.addAll(processedAmplitudes)
+                Log.d("AudioPlaybackScreen", "Loaded amplitudes: $amplitudes")
+            } else {
+                Log.e("AudioPlaybackScreen", "Failed to load amplitudes")
+            }
+        }
     }
 
     val currentMinutes = (currentPosition / 1000) / 60
@@ -72,12 +119,36 @@ fun AudioPlaybackScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(horizontal = 0.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = "Playing: ${recording.title}")
+        Text(
+            text = "Playing: ${recording.title}",
+        )
+        Spacer(modifier = Modifier.height(64.dp))
 
+        AudioWaveform(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(300.dp),
+            waveformAlignment = WaveformAlignment.Center,
+            amplitudeType = AmplitudeType.Avg,
+            progressBrush = SolidColor(Color.Magenta),
+            waveformBrush = SolidColor(Color.LightGray),
+            spikeWidth = 4.dp,
+            spikePadding = 2.dp,
+            spikeRadius = 4.dp,
+            progress = waveformProgress,
+            amplitudes = amplitudes.toList(), // Make sure to pass the list of amplitudes
+            onProgressChange = { newProgress ->
+                Log.d("AudioWaveform", "Progress changed: $newProgress")
+                waveformProgress = newProgress
+                mediaPlayer.seekTo((newProgress * totalDuration).toInt())
+            },
+            onProgressChangeFinished = {},
+        )
         Spacer(modifier = Modifier.weight(1f))
 
         Column(
@@ -103,7 +174,7 @@ fun AudioPlaybackScreen(
                     ),
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(0.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -121,7 +192,7 @@ fun AudioPlaybackScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             FloatingActionButton(
                 onClick = {
@@ -135,7 +206,8 @@ fun AudioPlaybackScreen(
                 modifier =
                     Modifier
                         .align(Alignment.CenterHorizontally)
-                        .size(80.dp),
+                        .size(80.dp)
+                        .padding(4.dp),
                 shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.background,

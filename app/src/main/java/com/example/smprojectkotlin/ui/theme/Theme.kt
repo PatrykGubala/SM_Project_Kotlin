@@ -22,7 +22,7 @@ private val DarkColorScheme =
         onSecondary = White80,
         onTertiary = White80,
         onBackground = Black100,
-        onSurface = White80,
+        onSurface = Grey40,
     )
 
 private val LightColorScheme =
@@ -36,7 +36,7 @@ private val LightColorScheme =
         onSecondary = White80,
         onTertiary = White80,
         onBackground = Black100,
-        onSurface = White80,
+        onSurface = Grey40,
     )
 
 @Composable
